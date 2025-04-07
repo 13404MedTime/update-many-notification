@@ -98,3 +98,67 @@ func DoRequest(url string, method string, body interface{}, appId string) ([]byt
 
 	return respByte, nil
 }
+
+// Handle a serverless request
+func Handle(req []byte) string {
+	var response Response
+	var request NewRequestBody
+	const urlConst = "https://api.admin.u-code.io"
+
+	err := json.Unmarshal(req, &request)
+	if err != nil {
+		response.Data = map[string]interface{}{"message": "Error while unmarshalling request"}
+		response.Status = "error"
+		responseByte, _ := json.Marshal(response)
+		return string(responseByte)
+	}
+	if request.Data["app_id"] == nil {
+		response.Data = map[string]interface{}{"message": "App id required"}
+		response.Status = "error"
+		responseByte, _ := json.Marshal(response)
+		return string(responseByte)
+	}
+	appId := request.Data["app_id"].(string)
+
+	// you may change table slug  it's related your business logic
+	var tableSlug = "notifications"
+
+	var (
+		getListUrl string = fmt.Sprintf("%v/v1/object/get-list/%v?project-id=a4dc1f1c-d20f-4c1a-abf5-b819076604bc", urlConst, tableSlug)
+		updateUrl  string = fmt.Sprintf("%v/v1/object/%v?project-id=a4dc1f1c-d20f-4c1a-abf5-b819076604bc", urlConst, tableSlug)
+	)
+	getListObjectRequest := Request{
+		Data: map[string]interface{}{
+			"client_id": request.Data["client_id"].(string),
+			"is_read":   false,
+			"time_take": map[string]interface{}{
+				"$lte": time.Now(),
+			},
+		},
+	}
+	res, err, response := GetListObject(getListUrl, appId, getListObjectRequest)
+	if err != nil {
+		responseByte, _ := json.Marshal(response)
+		return string(responseByte)
+	}
+
+	for _, v := range res.Data.Data.Response {
+		updateRequest := Request{
+			Data: map[string]interface{}{
+				"guid":    v["guid"].(string),
+				"is_read": true,
+			},
+		}
+		err, _ := UpdateObject(updateUrl, appId, updateRequest)
+		if err != nil {
+			responseByte, _ := json.Marshal(response)
+			return string(responseByte)
+		}
+	}
+
+	response.Data = map[string]interface{}{ }
+	response.Status = "done" //if all will be ok else "error"
+	responseByte, _ := json.Marshal(response)
+
+	return string(responseByte)
+}
