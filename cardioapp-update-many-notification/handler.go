@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"time"
 )
+
 // Datas This is response struct from create
 type Datas struct {
 	Data struct {
@@ -67,6 +68,19 @@ type NewRequestBody struct {
 }
 type Request struct {
 	Data map[string]interface{} `json:"data"`
+}
+
+// GetListClientApiResponse This is get list api response
+type GetListClientApiResponse struct {
+	Data GetListClientApiData `json:"data"`
+}
+
+type GetListClientApiData struct {
+	Data GetListClientApiResp `json:"data"`
+}
+
+type GetListClientApiResp struct {
+	Response []map[string]interface{} `json:"response"`
 }
 
 func DoRequest(url string, method string, body interface{}, appId string) ([]byte, error) {
@@ -156,9 +170,51 @@ func Handle(req []byte) string {
 		}
 	}
 
-	response.Data = map[string]interface{}{ }
+	response.Data = map[string]interface{}{}
 	response.Status = "done" //if all will be ok else "error"
 	responseByte, _ := json.Marshal(response)
 
 	return string(responseByte)
 }
+
+func GetListObject(url, appId string, request Request) (GetListClientApiResponse, error, Response) {
+	response := Response{}
+
+	getListResponseInByte, err := DoRequest(url, "POST", request, appId)
+	if err != nil {
+		response.Data = map[string]interface{}{"message": "Error while getting single object"}
+		response.Status = "error"
+		return GetListClientApiResponse{}, errors.New("error"), response
+	}
+	var getListObject GetListClientApiResponse
+	err = json.Unmarshal(getListResponseInByte, &getListObject)
+	if err != nil {
+		response.Data = map[string]interface{}{"message": "Error while unmarshalling get list object"}
+		response.Status = "error"
+		return GetListClientApiResponse{}, errors.New("error"), response
+	}
+	return getListObject, nil, response
+}
+
+func UpdateObject(url, appId string, request Request) (error, Response) {
+	response := Response{}
+
+	_, err := DoRequest(url, "PUT", request, appId)
+	if err != nil {
+		response.Data = map[string]interface{}{"message": "Error while updating object"}
+		response.Status = "error"
+		return errors.New("error"), response
+	}
+	return nil, response
+}
+
+// func main() {
+// 	data := `{
+// 		"data": {
+// 		  "app_id": "P-JV2nVIRUtgyPO5xRNeYll2mT4F5QG4bS",
+// 		  "client_id": "0337a3b6-14df-466b-814f-64c25bcced19"
+// 		}
+// 	  }`
+
+// 	fmt.Println(Handle([]byte(data)))
+// }
